@@ -31,6 +31,54 @@ def get_frames_data(filename, num_frames_per_clip=16):
     ''' Given a directory containing extracted frames, return a video clip of
     (num_frames_per_clip) consecutive frames as a list of np arrays '''
     ret_arr = []
+    s_index = 1
+    print(filename)
+    for parent, dirnames, filenames in os.walk(filename):
+        #print(len(filenames))
+        if(len(filenames)>num_frames_per_clip):
+            #print("get here long")
+            filenames = sorted(filenames)
+            s_index = random.randint(1, len(filenames) - num_frames_per_clip)
+            #print(s_index)
+            for i in range(s_index, s_index + num_frames_per_clip):
+                #print(i)
+                image_name = str(filename) + '/' + str(filenames[i])
+                #print(image_name)
+                img = Image.open(image_name)
+                img_data = np.array(img)
+                ret_arr.append(img_data)
+        elif (len(filenames)>8):
+            #print("get here short")
+            filenames = sorted(filenames)+sorted(filenames)
+            #print(filenames, len(filenames))
+            s_index = random.randint(1, len(filenames) - num_frames_per_clip)
+            #print(s_index)
+            for i in range(s_index, s_index + num_frames_per_clip):
+                #print(i)
+                image_name = str(filename) + '/' + str(filenames[i])
+                #print(image_name)
+                img = Image.open(image_name)
+                img_data = np.array(img)
+                ret_arr.append(img_data)
+        else :
+            #print("get here very short")
+            filenames = sorted(filenames)+sorted(filenames)+sorted(filenames)+sorted(filenames)
+            #print(filenames, len(filenames))
+            s_index = random.randint(1, len(filenames) - num_frames_per_clip)
+            #print(s_index)
+            for i in range(s_index, s_index + num_frames_per_clip):
+                #print(i)
+                image_name = str(filename) + '/' + str(filenames[i])
+                #print(image_name)
+                img = Image.open(image_name)
+                img_data = np.array(img)
+                ret_arr.append(img_data)
+    return ret_arr, s_index
+
+def _get_frames_data(filename, num_frames_per_clip=16):
+    ''' Given a directory containing extracted frames, return a video clip of
+    (num_frames_per_clip) consecutive frames as a list of np arrays '''
+    ret_arr = []
     s_index = 0
     #print(filename)
     for parent, dirnames, filenames in os.walk(filename):
@@ -45,6 +93,7 @@ def get_frames_data(filename, num_frames_per_clip=16):
             ret_arr.append(img_data)
     return ret_arr, s_index
 
+
 def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=16, height=228,width=171, shuffle=False):
     lines = open(filename,'r')
     read_dirnames = []
@@ -54,7 +103,7 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
     next_batch_start = -1
     lines = list(lines)
     #print(lines)
-    # np_mean = np.load('crop_mean.npy').reshape([num_frames_per_clip, crop_size, crop_size, 3])  #(16, 112, 112, 3)
+    #np_mean = np.load('crop_mean.npy').reshape([num_frames_per_clip, 112, 112, 3])  #(16, 112, 112, 3)
     np_mean = 0
     # Forcing shuffle, if start_pos is not specified
     if start_pos < 0:
@@ -73,10 +122,12 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
         line = lines[index].strip('\n').split()
         dirname = line[0]
         tmp_label = line[1]
+        #print(num_frames_per_clip)
         if not shuffle:
             print("Loading a video clip from {}...".format(dirname))
         tmp_data, _ = get_frames_data(dirname, num_frames_per_clip)   #one clip:(16, 112, 112, 3)
         img_datas = [];
+        #print(len(tmp_data))
         if(len(tmp_data)!=0):
             for j in range(len(tmp_data)):
                 img = Image.fromarray(tmp_data[j].astype(np.uint8))
@@ -89,14 +140,19 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
                 # img = img[(img.shape[0] - crop_size)/2:(img.shape[0] - crop_size)/2 + crop_size, (img.shape[1] - crop_size)/2:(img.shape[1] - crop_size)/2 + crop_size,:] - np_mean[j]
                 # img = img[(img.shape[0] - crop_size)/2:(img.shape[0] - crop_size)/2 + crop_size, (img.shape[1] - crop_size)/2:(img.shape[1] - crop_size)/2 + crop_size,:]
                 # img = np.array(img).astype(np.float32)
+                #crop_x = int((img.shape[0] - 112)/2)
+                #crop_y = int((img.shape[1] - 112)/2)
+                #img = img[crop_x:crop_x+112, crop_y:crop_y+112,:] - np_mean[j]
                 img = np.array(cv2.resize(np.array(img), (128,171))).astype(np.float32)
                 img_datas.append(img)
             data.append(img_datas)
             label.append(int(tmp_label))
             batch_index = batch_index + 1
             read_dirnames.append(dirname)
+      
     # pad (duplicate) data/label if less than batch_size
     valid_len = len(data)
+    print(valid_len, len(data), batch_size)
     pad_len = batch_size - valid_len
     if pad_len:
         for i in range(pad_len):

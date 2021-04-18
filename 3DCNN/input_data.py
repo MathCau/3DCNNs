@@ -27,7 +27,7 @@ import numpy as np
 import cv2
 import time
 
-def get_frames_data(filename, num_frames_per_clip=16):
+def _get_frames_data(filename, num_frames_per_clip=16):
   ''' Given a directory containing extracted frames, return a video clip of
   (num_frames_per_clip) consecutive frames as a list of np arrays '''
   ret_arr = []
@@ -46,6 +46,52 @@ def get_frames_data(filename, num_frames_per_clip=16):
       img_data = np.array(img)
       ret_arr.append(img_data)
   return ret_arr, s_index
+
+def get_frames_data(filename, num_frames_per_clip=16):
+    ret_arr = []
+    s_index = 1
+    #print(filename)
+    for parent, dirnames, filenames in os.walk(filename):
+        #print(len(filenames))
+        if(len(filenames)>num_frames_per_clip):
+            #print("get here long")
+            filenames = sorted(filenames)
+            s_index = random.randint(1, len(filenames) - num_frames_per_clip)
+            #print(s_index)
+            for i in range(s_index, s_index + num_frames_per_clip):
+                #print(i)
+                image_name = str(filename) + '/' + str(filenames[i])
+                #print(image_name)
+                img = Image.open(image_name)
+                img_data = np.array(img)
+                ret_arr.append(img_data)
+        elif (len(filenames)>8):
+            #print("get here short")
+            filenames = sorted(filenames)+sorted(filenames)
+            #print(filenames, len(filenames))
+            s_index = random.randint(1, len(filenames) - num_frames_per_clip)
+            #print(s_index)
+            for i in range(s_index, s_index + num_frames_per_clip):
+                #print(i)
+                image_name = str(filename) + '/' + str(filenames[i])
+                #print(image_name)
+                img = Image.open(image_name)
+                img_data = np.array(img)
+                ret_arr.append(img_data)
+        else :
+            #print("get here very short")
+            filenames = sorted(filenames)+sorted(filenames)+sorted(filenames)+sorted(filenames)
+            #print(filenames, len(filenames))
+            s_index = random.randint(1, len(filenames) - num_frames_per_clip)
+            #print(s_index)
+            for i in range(s_index, s_index + num_frames_per_clip):
+                #print(i)
+                image_name = str(filename) + '/' + str(filenames[i])
+                #print(image_name)
+                img = Image.open(image_name)
+                img_data = np.array(img)
+                ret_arr.append(img_data)
+    return ret_arr, s_index
 
 def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=16, crop_size=112, shuffle=True):
   lines = open(filename,'r')
@@ -109,3 +155,74 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
   np_arr_label = np.array(label).astype(np.int64)
 
   return np_arr_data, np_arr_label, next_batch_start, read_dirnames, valid_len
+
+def cropCenter(img, height, width):
+    h,w,c = img.shape
+    # print('h,w,c:', h,w,c)
+    dx = (h-height)//2
+    dy = (w-width )//2
+
+    y1 = dy
+    y2 = y1 + height
+    x1 = dx
+    x2 = x1 + width
+    # img = img[x1:x2,y1:y2,:]
+    img = img[y1:y2,x1:x2,:]
+    # print('img.shape:',img.shape)
+    return img
+def RandomCrop(rand_seed,img, top,left,height=224, width=224,u=0.5,aug_factor=9/8):
+    #first zoom in by a factor of aug_factor of input img,then random crop by(height,width)
+    # if rand_seed < u:
+    if 1:
+        # h,w,c = img.shape
+        # img = cv2.resize(img, (round(aug_factor*w), round(aug_factor*h)), interpolation=cv2.INTER_LINEAR)
+        # h, w, c = img.shape
+
+        new_h, new_w = height,width
+
+        # top = np.random.randint(0, h - new_h)
+        # left = np.random.randint(0, w - new_w)
+
+        img = img[top: top + new_h,
+              left: left + new_w]
+    return img
+def randomHorizontalFlip(rand_seed,img, u=0.5):
+    if rand_seed < u:
+        img = cv2.flip(img,1)  #np.fliplr(img)  #cv2.flip(img,1) ##left-right
+    return img
+def normalize(arr):
+    arr=arr.astype('float32')
+    if arr.max() > 1.0:
+        arr/=255.0
+    return arr
+def sub_mean(batch_arr):
+    # print('batch_arr.shape',batch_arr.shape)  #(32, 16, 112, 112, 3)
+    for j in range(len(batch_arr)):
+        batch_arr[j] -= np_mean
+    return batch_arr
+def train_aug(batch,is_train=True,Crop_heith=224,Crop_width=224,norm=True):
+    new_batch=np.zeros((batch.shape[0],batch.shape[1],Crop_heith,Crop_width,3))
+    # (16, 16, 112, 112, 3)
+    rand_seed=random.random()
+    random.seed(5)
+    for i in range(batch.shape[0]):
+        h, w, c = batch.shape[2:]
+        new_h, new_w = Crop_heith, Crop_width
+        dx = (h - Crop_heith) // 2
+        dy = (w - Crop_width) // 2
+        top = np.random.randint(0, h - new_h)
+        left = np.random.randint(0, w - new_w)
+        for j in range(batch.shape[1]):
+            if is_train:
+                new_batch[i, j, :, :, :] = RandomCrop(rand_seed,batch[i, j, :, :, :],top,left,
+                                                    height=Crop_heith, width=Crop_width)
+                new_batch[i, j, :, :, :] = randomHorizontalFlip(rand_seed,new_batch[i, j, :, :, :])
+            else:
+                new_batch[i, j, :, :, :] = cv2.resize(batch[i, j, :, :, :],(Crop_width,Crop_heith))
+
+    # return new_batch
+    # return normalize(new_batch)
+    if norm:
+        return sub_mean(new_batch)
+    else:
+        return new_batch
